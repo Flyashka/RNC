@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Хост: 127.0.0.1
--- Время создания: Май 22 2023 г., 12:11
+-- Время создания: Май 22 2023 г., 15:12
 -- Версия сервера: 10.4.28-MariaDB
 -- Версия PHP: 8.2.4
 
@@ -24,10 +24,10 @@ SET time_zone = "+00:00";
 -- --------------------------------------------------------
 
 --
--- Структура таблицы `convertasion`
+-- Структура таблицы `conversion`
 --
 
-CREATE TABLE `convertasion` (
+CREATE TABLE `conversion` (
   `id` int(11) NOT NULL,
   `type` varchar(10) NOT NULL,
   `conversion_rate` decimal(10,2) NOT NULL,
@@ -36,12 +36,12 @@ CREATE TABLE `convertasion` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Дамп данных таблицы `convertasion`
+-- Дамп данных таблицы `conversion`
 --
 
-INSERT INTO `convertasion` (`id`, `type`, `conversion_rate`, `last_operation_datetime`, `person_name`) VALUES
-(1, 'online', 0.01, '2023-05-22 12:56:01', 'Антон'),
-(2, 'cash', 0.00, '2023-05-22 12:56:48', 'JАнтон');
+INSERT INTO `conversion` (`id`, `type`, `conversion_rate`, `last_operation_datetime`, `person_name`) VALUES
+(1, 'online', 0.01, '2023-05-22 13:49:42', 'Антон'),
+(2, 'cash', 0.00, '2023-05-22 13:49:55', 'Антон');
 
 -- --------------------------------------------------------
 
@@ -51,18 +51,10 @@ INSERT INTO `convertasion` (`id`, `type`, `conversion_rate`, `last_operation_dat
 
 CREATE TABLE `data` (
   `ls` int(11) NOT NULL,
-  `y` int(11) NOT NULL,
+  `y` decimal(10,2) NOT NULL,
   `datetime` datetime NOT NULL,
-  `has` varchar(32) NOT NULL
+  `hash` varchar(255) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Дамп данных таблицы `data`
---
-
-INSERT INTO `data` (`ls`, `y`, `datetime`, `has`) VALUES
-(123456, 500, '2023-05-15 14:46:06', '279d3c740ec52f44e24f634080e8ee42'),
-(324874, 3000, '2023-05-22 11:58:54', 'f7f467dbd0d7340c3199b53cedb93d3f');
 
 -- --------------------------------------------------------
 
@@ -71,13 +63,12 @@ INSERT INTO `data` (`ls`, `y`, `datetime`, `has`) VALUES
 --
 
 CREATE TABLE `transaction` (
-  `ls` int(11) NOT NULL,
-  `sum` decimal(10,2) NOT NULL,
-  `type` varchar(50) NOT NULL,
+  `ls` int(6) UNSIGNED NOT NULL,
+  `sum` float(10,2) NOT NULL,
   `datetime` datetime NOT NULL,
   `valid` tinyint(1) NOT NULL,
-  `has` tinyint(1) NOT NULL,
-  `conversion_rate` decimal(10,2) NOT NULL
+  `hash` varchar(32) NOT NULL,
+  `conversion_rate` float(10,2) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -85,9 +76,9 @@ CREATE TABLE `transaction` (
 --
 
 --
--- Индексы таблицы `convertasion`
+-- Индексы таблицы `conversion`
 --
-ALTER TABLE `convertasion`
+ALTER TABLE `conversion`
   ADD PRIMARY KEY (`id`);
 
 --
@@ -97,13 +88,19 @@ ALTER TABLE `data`
   ADD PRIMARY KEY (`ls`);
 
 --
+-- Индексы таблицы `transaction`
+--
+ALTER TABLE `transaction`
+  ADD PRIMARY KEY (`ls`,`datetime`);
+
+--
 -- AUTO_INCREMENT для сохранённых таблиц
 --
 
 --
--- AUTO_INCREMENT для таблицы `convertasion`
+-- AUTO_INCREMENT для таблицы `conversion`
 --
-ALTER TABLE `convertasion`
+ALTER TABLE `conversion`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 COMMIT;
 
