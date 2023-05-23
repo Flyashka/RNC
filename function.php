@@ -19,57 +19,58 @@ function insertTransaction($ls, $sum2) {
     }
 
     // получаем значение conversion_rate из таблицы conversion
-$type = "online";
-$stmt = $conn->prepare("SELECT conversion_rate, last_operation_datetime FROM conversion WHERE type = ?");
-$stmt->bind_param("s", $type);
-$stmt->execute();
-$result = $stmt->get_result();
+    $type = "online";
+    $stmt = $conn->prepare("SELECT conversion_rate, last_operation_datetime FROM conversion WHERE type = ?");
+    $stmt->bind_param("s", $type);
+    $stmt->execute();
+    $result = $stmt->get_result();
 
-// проверяем, что получены данные из таблицы conversion
-if ($result->num_rows == 1) {
-    $row = $result->fetch_assoc();
-    $conversion_rate = $row["conversion_rate"];
-    $last_operation_datetime = $row["last_operation_datetime"];
+    // проверяем, что получены данные из таблицы conversion
+    if ($result->num_rows == 1) {
+        $row = $result->fetch_assoc();
+        $conversion_rate = $row["conversion_rate"];
+        $last_operation_datetime = $row["last_operation_datetime"];
 
-    // вычисляем значение суммы в рублях
-    $sum = $sum2 * $conversion_rate;
+        // вычисляем значение суммы в рублях
+        $sum = $sum2 * $conversion_rate;
 
-    // вычисляем хеш-код строки
-    $hash = md5($ls . $datetime);
+        // вычисляем хеш-код строки
+        $hash = md5($ls . $datetime);
 
-    // подготавливаем запрос к базе данных с заполнителями
-    $stmt = $conn->prepare("INSERT INTO transaction (ls, sum, datetime, valid, hash, conversion_rate) VALUES (?, ?, ?, 1, ?, ?)");
+        // подготавливаем запрос к базе данных с заполнителями
+        $stmt = $conn->prepare("INSERT INTO transaction (ls, sum, datetime, valid, hash, conversion_rate) VALUES (?, ?, ?, 1, ?, ?)");
 
-    // связываем параметры с заполнителями
-    $stmt->bind_param("isssd", $ls,$sum, $datetime, $hash, $conversion_rate);
+        // связываем параметры с заполнителями
+        $stmt->bind_param("isssd", $ls,$sum, $datetime, $hash, $conversion_rate);
 
-    // выполняем запрос к базе данных
-    if ($stmt->execute() === TRUE) {
-        echo "New record created successfully";
-        
-        // обновляем время в таблице "conversion"
-        $current_datetime = date("Y-m-d H:i:s");
-        if ($current_datetime != $last_operation_datetime) {
-            $stmt = $conn->prepare("UPDATE conversion SET last_operation_datetime = ?");
-            $stmt->bind_param("s", $current_datetime);
-            $stmt->execute();
+        // выполняем запрос к базе данных
+        if ($stmt->execute() === TRUE) {
+            echo "New record created successfully";
+            
+            // обновляем время в таблице "conversion"
+            $current_datetime = date("Y-m-d H:i:s");
+            if ($current_datetime != $last_operation_datetime) {
+                $stmt = $conn->prepare("UPDATE conversion SET last_operation_datetime = ?");
+                $stmt->bind_param("s", $current_datetime);
+                $stmt->execute();
+            }
+        } else {
+            echo "Error: " . $stmt->error;
         }
-    } else {
-        echo "Error: " . $stmt->error;
-    }
 
-    // закрываем подготовленный запрос и соединение с базой данных
-    $stmt->close();
-    $conn->close();
-} else {
-    echo "Error: no data found in conversion table or record is not uniq";
+        // закрываем подготовленный запрос и соединение с базой данных
+        $stmt->close();
+        $conn->close();
+    } else {
+        echo "Error: no data found in conversion table or record is not uniq";
+    }
 }
+
+if(isset($_POST['submit'])) {
+  $ls = $_POST['ls'];
+  $sum2 = $_POST['sum'];
+  insertTransaction($ls, $sum2);
 }
-if (isset($_GET['submit'])) { 
-            $ls = $_GET['ls'];  
-            $payment = $_GET['payment'];         
-        } 
-insertTransaction($ls, $payment);
 
 function transferData() {
     $servername = "localhost";
@@ -82,7 +83,7 @@ function transferData() {
 
     // проверяем соединение
     if ($conn->connect_error) {
-        die("Connection failed: " . $conn->connect_error);
+        die("Connection failed: ". $conn->connect_error);
     }
 
     // выбираем данные из таблицы "transaction", где "Valid" = 1
@@ -97,13 +98,13 @@ function transferData() {
             $dataResult = $conn->query($sql);
 
             if ($dataResult->num_rows > 0) {
-                // получаемзначение "y" и "hash" из таблицы "data"
+                // получаем значение "y" и "hash" из таблицы "data"
                 $dataRow = $dataResult->fetch_assoc();
 
                 // обновляем значение "y", "datetime" и "hash" в таблице "data" на значения из таблицы "transaction"
                 $y = $dataRow["y"] + $row["sum"];
                 $hash = $row["hash"] . $row["sum"];
-                $sql = "UPDATE data SET y = " . $y . ", datetime = '" . $row["datetime"] . "', hash = '" . $hash . "' WHERE ls = " . $row["ls"];
+                $sql = "UPDATE data SET y = " . $y . ", datetime = '" . $row["datetime"] . "', hash = '" . $hash . "' WHERE ls =" . $row["ls"];
                 $conn->query($sql);
             } else {
                 // создаем новую запись в таблице "data"
@@ -120,5 +121,21 @@ function transferData() {
     // закрываем соединение с базой данных
     $conn->close();
 }
+
 transferData();
 ?>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Insert Transaction</title>
+</head>
+<body>
+  <form method="post" action="">
+    <label for="ls">LS:</label>
+    <input type="text" name="ls" id="ls"><br><br>
+    <label for="sum">Sum:</label>
+    <input type="text" name="sum" id="sum"><br><br>
+    <input type="submit" name="submit" value="Insert Transaction">
+  </form>
+</body>
+</html>
