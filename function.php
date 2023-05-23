@@ -1,55 +1,91 @@
 <?php
-function insertTransaction($ls, $sum, $type) {
+function insertTransaction($ls, $sum2) {
     // устанавливаем часовой пояс на Московское время
     date_default_timezone_set('Europe/Moscow');
-    
-    $datetime = date("Y-m-d H:i:s");
-    $hash = md5($ls . $sum . $type . $datetime); // вычисляем хеш-код строки
 
-    $servername = "localhost"; //Подключаемся к БД, на данном примере я использовал локальную сеть
+    // получаем текущую дату и время
+    $datetime = date("Y-m-d H:i:s");
+
+    // устанавливаем соединение с базой данных
+    $servername = "localhost";
     $username = "root";
     $password = "";
     $dbname = "rnc";
-
-    // Подключаемся к БД
     $conn = new mysqli($servername, $username, $password, $dbname);
 
-    // Проверяем соединение к БД
+    // проверяем соединение
     if ($conn->connect_error) {
         die("Connection failed: " . $conn->connect_error);
     }
 
-    // Подготавливаем запрос к базе данных с заполнителями
-    $stmt = $conn->prepare("INSERT INTO transaction (ls, sum, type, datetime, Valid, hash) VALUES (?, ?, ?, ?, 1, ?)");
+    // получаем значение conversion_rate из таблицы conversion
+$type = "online";
+$stmt = $conn->prepare("SELECT conversion_rate, last_operation_datetime FROM conversion WHERE type = ?");
+$stmt->bind_param("s", $type);
+$stmt->execute();
+$result = $stmt->get_result();
 
-    // Связываем параметры с заполнителями (со строкой выше)
-    $stmt->bind_param("siiss", $ls, $sum, $type, $datetime, $hash);
+// проверяем, что получены данные из таблицы conversion
+if ($result->num_rows == 1) {
+    $row = $result->fetch_assoc();
+    $conversion_rate = $row["conversion_rate"];
+    $last_operation_datetime = $row["last_operation_datetime"];
+
+    // вычисляем значение суммы в рублях
+    $sum = $sum2 * $conversion_rate;
+
+    // вычисляем хеш-код строки
+    $hash = md5($ls . $datetime);
+
+    // подготавливаем запрос к базе данных с заполнителями
+    $stmt = $conn->prepare("INSERT INTO transaction (ls, sum, datetime, valid, hash, conversion_rate) VALUES (?, ?, ?, 1, ?, ?)");
+
+    // связываем параметры с заполнителями
+    $stmt->bind_param("isssd", $ls,$sum, $datetime, $hash, $conversion_rate);
 
     // выполняем запрос к базе данных
-    $stmt->execute();
+    if ($stmt->execute() === TRUE) {
+        echo "New record created successfully";
+        
+        // обновляем время в таблице "conversion"
+        $current_datetime = date("Y-m-d H:i:s");
+        if ($current_datetime != $last_operation_datetime) {
+            $stmt = $conn->prepare("UPDATE conversion SET last_operation_datetime = ?");
+            $stmt->bind_param("s", $current_datetime);
+            $stmt->execute();
+        }
+    } else {
+        echo "Error: " . $stmt->error;
+    }
 
     // закрываем подготовленный запрос и соединение с базой данных
     $stmt->close();
     $conn->close();
+} else {
+    echo "Error: no data found in conversion table or record is not uniq";
 }
-
-insertTransaction(324874, 500, 1);
+}
+if (isset($_GET['submit'])) { 
+            $ls = $_GET['ls'];  
+            $payment = $_GET['payment'];         
+        } 
+insertTransaction($ls, $payment);
 
 function transferData() {
-    $servername = "localhost"; //Подключаемся к БД, данные должны быть индентичны тем, которые использовали для функции выше
+    $servername = "localhost";
     $username = "root";
     $password = "";
     $dbname = "rnc";
 
-    // Создаем подключение к базе данных
+    // создаем подключение к базе данных
     $conn = new mysqli($servername, $username, $password, $dbname);
 
-    // Проверяем соединение
+    // проверяем соединение
     if ($conn->connect_error) {
         die("Connection failed: " . $conn->connect_error);
     }
 
-    // Выбираем данные из таблицы "transaction", где "Valid" = 1
+    // выбираем данные из таблицы "transaction", где "Valid" = 1
     $sql = "SELECT ls, sum, datetime, hash FROM transaction WHERE Valid = 1";
     $result = $conn->query($sql);
 
@@ -57,18 +93,21 @@ function transferData() {
     if ($result->num_rows > 0) {
         while($row = $result->fetch_assoc()) {
             // проверяем, существует ли запись с таким же "ls" в таблице "data"
-            $sql = "SELECT y FROM data WHERE ls = " . $row["ls"];
+            $sql = "SELECT y, hash FROM data WHERE ls = " . $row["ls"];
             $dataResult = $conn->query($sql);
 
             if ($dataResult->num_rows > 0) {
-                // обновляем значение "y", "datetime" и "has" в таблице "data" на значения из таблицы "transaction"
+                // получаемзначение "y" и "hash" из таблицы "data"
                 $dataRow = $dataResult->fetch_assoc();
+
+                // обновляем значение "y", "datetime" и "hash" в таблице "data" на значения из таблицы "transaction"
                 $y = $dataRow["y"] + $row["sum"];
-                $sql = "UPDATE data SET y = " . $y . ", datetime = '" . $row["datetime"] . "', has = '" . $row["hash"] . "' WHERE ls = " . $row["ls"];
+                $hash = $row["hash"] . $row["sum"];
+                $sql = "UPDATE data SET y = " . $y . ", datetime = '" . $row["datetime"] . "', hash = '" . $hash . "' WHERE ls = " . $row["ls"];
                 $conn->query($sql);
             } else {
-                // создаем новую запись в таблице "data" или обновляем значения "y", "datetime" и "has", если запись с таким же "ls" уже существует
-                $sql = "INSERT INTO data (ls, y, datetime, has) VALUES (" . $row["ls"] . ", " . $row["sum"] . ", '" . $row["datetime"] . "', '" . $row["hash"] . "') ON DUPLICATE KEY UPDATE y = y + " . $row["sum"] . ", datetime = '" . $row["datetime"] . "', has = '" . $row["hash"] . "'";
+                // создаем новую запись в таблице "data"
+                $sql = "INSERT INTO data (ls, y, datetime, hash) VALUES (" . $row["ls"] . ", " . $row["sum"] . ", '" . $row["datetime"] . "', '" . $row["hash"] . "')";
                 $conn->query($sql);
             }
 
@@ -81,6 +120,5 @@ function transferData() {
     // закрываем соединение с базой данных
     $conn->close();
 }
-
 transferData();
 ?>
