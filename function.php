@@ -17,6 +17,10 @@ function insertTransaction($ls, $sum2) {
     if ($conn->connect_error) {
         die("Connection failed: " . $conn->connect_error);
     }
+    if ($sum2 <= 0) {
+    echo "Ошибка! Сумма пополнения не может быть меньше или равна 0";
+    return;
+}
 
     // получаем значение conversion_rate из таблицы conversion
     $type = "online";
@@ -45,7 +49,7 @@ function insertTransaction($ls, $sum2) {
 
         // выполняем запрос к базе данных
         if ($stmt->execute() === TRUE) {
-            echo "New record created successfully";
+            echo "Новая запись успешна созданна";
             
             // обновляем время в таблице "conversion"
             $current_datetime = date("Y-m-d H:i:s");
@@ -131,11 +135,13 @@ transferData();
 </head>
 <body>
   <form method="post" action="">
-    <label for="ls">LS:</label>
+    <label for="ls">Номер лицевого счёта:</label>
     <input type="text" name="ls" id="ls"><br><br>
-    <label for="sum">Sum:</label>
+    <label for="sum">Сумма:</label>
     <input type="text" name="sum" id="sum"><br><br>
-    <input type="submit" name="submit" value="Insert Transaction">
+    <input type="submit" name="submit" value="Выполнить транзакцию">
   </form>
 </body>
 </html>
+
+
